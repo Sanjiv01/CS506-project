@@ -10,3 +10,6 @@ __pycache__/
 # Output
 preprocessing_output.ipynb
 
+*.csv 
+*.pkl 
+
