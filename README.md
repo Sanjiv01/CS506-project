@@ -1,69 +1,133 @@
-# Project Proposal
+# CS506 Final Project — Spotify Playlist Completion
 
-## Project Description
-Music streaming platforms rely heavily on recommender systems to help users discover new songs. In this project, we aim to build a playlist-based music recommendation system that predicts which songs are likely to belong in a playlist, based on:
-- Other songs already in the same playlist
-- A user’s other playlists
+## Overview
 
-We begin with collaborative filtering methods and, if time permits, extend the system with content-based features derived from song lyrics to build a hybrid recommender.
+Given a partially-observed playlist, predict which songs are missing from it.
+We frame this as a **ranking problem**: given a set of observed songs, return a ranked list of candidates and evaluate using HitRate, Recall, NDCG, and MRR at K.
 
-## Project Goals
-Primary Goal
-- Build a model that can predict missing songs in a playlist given partial playlist information.
+---
 
-Secondary Goal
-- Leverage user's other playlists or lyrics of the song to boost accuracy of the model
+## Results
 
-Measurable Objectives
-- Formulate playlist completion as a ranking problem
-- Evaluate performance using :
-	- Hit Rate @ K
-	- Recall @ K
-	- Mean Reciprocal Rank (MRR)
+| Model | HitRate@10 | Recall@10 | NDCG@10 | MRR@10 | Coverage |
+|---|---|---|---|---|---|
+| Popularity Baseline | 0.028 | 0.008 | 0.007 | 0.014 | 0.09% |
+| Co-occurrence | 0.345 | 0.174 | 0.172 | 0.229 | 8.1% |
+| **BM25 Co-occurrence** | **0.421** | **0.206** | **0.206** | **0.276** | **10.9%** |
+| ALS (factors=32) | 0.099 | 0.028 | 0.029 | 0.054 | 3.9% |
+| KNN (K=500) | 0.314 | 0.172 | 0.178 | 0.225 | 6.3% |
 
-Baseline
-- A very basic baseline is the model that recommends music based on popularity (e.g., recommending globally popular tracks)
+**BM25 is the best-performing model**, achieving a 15x improvement over the popularity baseline and a +22% relative gain over raw co-occurrence.
 
-## Data Collection
-- Spotify Playlists Dataset from Kaggle (https://www.kaggle.com/datasets/andrewmvd/spotify-playlists)
-	- Collection method : Download from kaggle
-	- features in the dataset
-		- user_id, artist_name, track_name, playlist_name
-- Lyrics of the song
-	- Collection method : scrape genius.com (https://genius.com/) or use a third-party scraping library (https://lyricsgenius.readthedocs.io/en/master/)
-	- Could be potentially used to measure similarity between musics (for content-based filtering)
+---
 
-## Data Cleaning & Processing
-- Remove duplicate tracks and playlists
-- Normalize artist and track names
-- Handle missing or inconsistent metadata
-- Filter users and playlists with extremely small sizes (cold start problem)
+## Dataset
 
-## Modeling
-- First try Collaborative Filtering methods
-	- Neighborhood-based methods
-	- Matrix Factorization
-	- Autoencoder
-- Then, if we have time, add Content-based methods to make the approach hybrid
-	- Lyrics embeddings using large language models
-	- cosine similarity between song embeddings
+**Source:** [Spotify Playlists — Kaggle](https://www.kaggle.com/datasets/andrewmvd/spotify-playlists)
+**Raw size:** 617K rows of `(user_id, artistname, trackname, playlistname)` tuples scraped from Spotify's public playlist API.
+**After filtering:** ~337K rows / 86.6K songs / 9,296 playlists.
 
-## Evaluation
-- Hold out a portion of tracks from a portion of playlists for testing
-- Train on remaining playlists and tracks
-- Measure ranking metrics (Recall@K, MRR)
-- Compare against baseline models
+---
 
-## Project timeline (8 week)
-- Data Collection (1-2nd week)
-    - Downloading Spotify Playlists Dataset from Kaggle
-    - Scraping Lytrics in the dataset
-    - Find ways to add more data
-- Preliminary Modeling (3-4th week)
-	- mostly focus on Collaborative Filtering methods (Neighborhood-based methods, Matrix Factorization, Autoendoer)
-    - compare and analyze results
-- Content-based Modeling & Develop a Hybrid model (Collaborative + Content-based) (5-6th week)
-	- Based on the lyrics of the song, measure similarity between songs (from embeddings from Large language models)
-	- Ensemble two methods to develop a Hybrid model
-- Make report and presentation slides (7-8th week)
+## How to Run
 
+### On Google Colab (recommended)
+
+1. Upload `main.ipynb` to Colab
+2. Upload `spotify_dataset.csv` via the **Files panel** (left sidebar)
+3. **Runtime → Run all**
+
+The notebook auto-detects `/content/spotify_dataset.csv`. No other setup needed.
+
+### Locally
+
+```bash
+pip install -r requirements.txt
+jupyter notebook main.ipynb
+```
+
+Set `COLAB_MODE = False` in the config cell and ensure `spotify_dataset.csv` is in the same directory as the notebook.
+
+> **Note:** `implicit` has been removed from dependencies. ALS is now implemented with `numpy` + `scipy` only, compatible with Python 3.14+.
+
+---
+
+## Configuration
+
+Two key constants at the top of `main.ipynb` (cell 3):
+
+| Constant | Default | Description |
+|---|---|---|
+| `SAMPLE_FRACTION` | `0.60` | Fraction of playlists to sample. Set to `1.0` for full dataset (~4x more data, better results) |
+| `COLAB_MODE` | `True` | `True` = load from `/content/`, `False` = load from local `DATA_PATH` |
+
+---
+
+## Models
+
+### 1. Popularity Baseline
+Recommends globally most-popular songs to every user. Null model — any useful recommender must beat it.
+
+### 2. Item-Item Co-occurrence
+For each observed song, finds all training playlists containing it and aggregates co-occurring songs by raw count. Simple but strong on human-curated playlists.
+
+### 3. BM25 Co-occurrence *(best model)*
+Applies BM25 (k1=1.5, b=0.75) weighting to co-occurrence: penalizes songs from very large playlists, rewards songs supported by many independent small playlists. Removes the playlist-length bias in raw co-occurrence.
+
+### 4. ALS Matrix Factorization
+Vectorised Alternating Least Squares with SVD warm-start. Learns 32-dimensional latent item embeddings. Inference uses inverse-popularity weighted mean of observed song embeddings. Underperforms neighbourhood methods at this dataset scale (0.18% matrix density) but improves significantly on the full dataset.
+
+- `factors=32`, `iterations=10`, `regularization=0.1`
+- Pure `numpy` + `scipy` + `sklearn` — no compiled extensions
+
+### 5. KNN Playlist Similarity
+Finds the K=500 most cosine-similar training playlists to the query, aggregates their songs with softmax-sharpened neighbour weights and IDF-style query weighting. Includes a mild popularity penalty on output scores to improve catalog diversity.
+
+---
+
+## Evaluation Metrics
+
+| Metric | Description |
+|---|---|
+| **HitRate@K** | Fraction of test cases with at least 1 hidden song in top-K |
+| **Recall@K** | Average fraction of hidden songs recovered in top-K |
+| **NDCG@K** | Normalized Discounted Cumulative Gain — rewards hits ranked higher |
+| **MRR@K** | Mean Reciprocal Rank of the first correct hit |
+
+Evaluated at K = 5, 10, 20, 50. Test set: 20% of playlists with ~20% of each playlist's songs hidden.
+
+---
+
+## Hypotheses & Verdicts
+
+| Hypothesis | Verdict |
+|---|---|
+| H1: Popularity is a weak baseline | Confirmed — 2.8% vs 42.1% HitRate@10 |
+| H2: Co-occurrence captures genre context | Confirmed — 12x gain over popularity |
+| H3: BM25 length-normalization helps | Confirmed — +22% relative gain over co-occurrence |
+| H4: ALS underfits on sparse data | Confirmed — 9.9% HitRate, below co-occurrence |
+| H5: KNN competitive on sparse data | Partially confirmed — beats ALS but below co-occurrence at this scale |
+
+---
+
+## Repository Structure
+
+```
+CS506-project/
+├── main.ipynb          # Full pipeline: data loading, models, evaluation, visualizations
+├── data_processing.py  # Standalone data pipeline utilities
+├── recommendation.py   # Standalone recommendation functions
+├── download_data.py    # Downloads dataset via kagglehub
+├── requirements.txt    # Python dependencies
+└── tests/              # Unit tests for preprocessing
+```
+
+---
+
+## Dependencies
+
+```
+numpy, pandas, matplotlib, scikit-learn, scipy, rank-bm25, kagglehub, jupyter
+```
+
+No compiled extensions required — works on Python 3.14+ without a C++ compiler.
