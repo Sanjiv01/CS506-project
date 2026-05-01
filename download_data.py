@@ -1,32 +1,25 @@
-"""
-Download the Spotify Playlists dataset from Kaggle.
-Requires: pip install kagglehub
-"""
-import os
+import argparse
 import shutil
+from pathlib import Path
+
 import kagglehub
 
-DATA_FILE = "spotify_dataset.csv"
 
-def main():
-    if os.path.exists(DATA_FILE):
-        print(f"'{DATA_FILE}' already exists. Skipping download.")
-        return
+DATASET = "andrewmvd/spotify-playlists"
+FILENAME = "spotify_dataset.csv"
 
-    print("Downloading Spotify Playlists dataset from Kaggle...")
-    path = kagglehub.dataset_download("andrewmvd/spotify-playlists")
-    print(f"Dataset downloaded to: {path}")
 
-    # Find the CSV file in the downloaded directory
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            if f.endswith(".csv"):
-                src = os.path.join(root, f)
-                shutil.copy2(src, DATA_FILE)
-                print(f"Copied '{src}' -> '{DATA_FILE}'")
-                return
+def download(dest: Path) -> Path:
+    dest.mkdir(parents=True, exist_ok=True)
+    src = Path(kagglehub.dataset_download(DATASET)) / FILENAME
+    target = dest / FILENAME
+    shutil.copy2(src, target)
+    return target
 
-    raise FileNotFoundError(f"No CSV file found in downloaded dataset at {path}")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=f"Download {DATASET} from Kaggle.")
+    parser.add_argument("--dest", type=Path, default=Path("data"))
+    args = parser.parse_args()
+    path = download(args.dest)
+    print(f"Saved to: {path}")
