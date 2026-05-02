@@ -1,7 +1,5 @@
 # CS506 Final Project — Spotify Playlist Completion
 
-![tests](https://github.com/tarushigandhi/CS506-project/actions/workflows/test.yml/badge.svg)
-
 Given a partially-observed playlist, predict which songs are missing from it.
 We frame this as a **ranking problem**: given a set of observed songs, return a ranked list of candidates and evaluate using HitRate, Recall, NDCG, and MRR at K.
 
@@ -167,4 +165,4 @@ CS506-project/
 
 ## Dependencies
 
-See [requirements.txt](requirements.txt). All pure-Python — no compiled extensions, works on Python 3.11 through 3.14.
+See [requirements.txt](requirements.txt). All pure-Python - no compiled extensions, works on Python 3.11 through 3.14.
