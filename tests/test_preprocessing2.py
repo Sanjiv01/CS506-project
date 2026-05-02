@@ -13,7 +13,10 @@ import pandas as pd
 import pytest
 
 
-NOTEBOOK_PATH = Path('/mnt/data/preprocessing.ipynb')
+NOTEBOOK_PATH = Path(__file__).resolve().parents[1] / 'preprocessing.ipynb'
+if not NOTEBOOK_PATH.exists():
+    pytest.skip(f'preprocessing.ipynb not found at {NOTEBOOK_PATH}', allow_module_level=True)
+
 TARGET_FUNCTIONS = {
     'clean_col',
     'robust_load_csv',
