@@ -1,4 +1,6 @@
-# CS506 Final Project — Spotify Playlist Completion
+# CS506 Final Project - Spotify Playlist Completion
+
+Video Link - https://youtu.be/2s7LOVB7iKo
 
 Given a partially-observed playlist, predict which songs are missing from it.
 We frame this as a **ranking problem**: given a set of observed songs, return a ranked list of candidates and evaluate using HitRate, Recall, NDCG, and MRR at K.
